@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rastro de Carbono</title>
+<meta name="description" content="Jogo de decisões e contas sobre pegada de carbono para estudantes de 14 e 15 anos.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='12' fill='%23D99A06'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: caderno de campo — barra fixa com o medidor de CO₂, cartão da fase com dados à esquerda e decisões à direita (empilha no celular) */
+:root{
+  --bg:#EDF1EA; --surface:#FFFFFF; --sunk:#F5F8F3; --ink:#17261F; --muted:#56665D; --line:#CAD4CB;
+  --ipe:#D99A06; --ipe-soft:#FBEFC8; --teal:#1E7A6E; --teal-soft:#D7ECE8; --ember:#C2491D; --ember-soft:#F8E0D5; --good:#24804F;
+  --f-display:"Unbounded", "Arial Black", system-ui, sans-serif;
+  --f-body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-data:"JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0F1713; --surface:#17221C; --sunk:#131D18; --ink:#E5EDE7; --muted:#9DB1A4; --line:#2C3B33;
+  --ipe:#F2C14E; --ipe-soft:#3A2F10; --teal:#55B8A8; --teal-soft:#16332E; --ember:#F07A4F; --ember-soft:#3B1E14; --good:#5CC48A; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0F1713; --surface:#17221C; --sunk:#131D18; --ink:#E5EDE7; --muted:#9DB1A4; --line:#2C3B33;
+  --ipe:#F2C14E; --ipe-soft:#3A2F10; --teal:#55B8A8; --teal-soft:#16332E; --ember:#F07A4F; --ember-soft:#3B1E14; --good:#5CC48A; color-scheme:dark }
+
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+body{background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:17px; line-height:1.5;}
+body::before{content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top,0px); z-index:10; background:var(--ink)}
+.wrap{max-width:1120px; margin:0 auto; padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px));}
+h1,h2,h3{font-family:var(--f-display); text-wrap:balance; line-height:1.15; margin:0}
+button{font:inherit; color:inherit}
+:focus-visible{outline:3px solid var(--ipe); outline-offset:2px}
+
+/* barra superior */
+.top{position:sticky; top:env(safe-area-inset-top,0px); z-index:5; background:var(--ink); color:var(--bg)}
+.top .wrap{display:flex; flex-wrap:wrap; align-items:center; gap:10px 24px; padding-block:12px}
+.brand{font-family:var(--f-display); font-weight:800; font-size:1.05rem; letter-spacing:.01em; display:flex; align-items:center; gap:10px}
+.brand i{display:inline-block; width:14px; height:14px; border-radius:50%; background:var(--ipe); box-shadow:0 0 0 4px color-mix(in srgb, var(--ipe) 30%, transparent)}
+.pips{display:flex; gap:4px; flex:1; min-width:180px}
+.pip{flex:1; height:8px; border-radius:2px; background:color-mix(in srgb, var(--bg) 22%, transparent)}
+.pip.done{background:var(--ipe)}
+.pip.now{background:var(--bg)}
+.meter{font-family:var(--f-data); font-variant-numeric:tabular-nums; text-align:right; line-height:1.2}
+.meter small{display:block; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; opacity:.7}
+.meter b{font-size:1.25rem}
+
+main{padding-block:28px 80px}
+
+/* introdução */
+.intro{display:grid; grid-template-columns:1.2fr 1fr; gap:32px; align-items:start}
+.intro h1{font-size:clamp(2.2rem, 6vw, 4rem); font-weight:800; letter-spacing:-.02em}
+.intro h1 span{color:var(--ember)}
+.lead{font-size:1.15rem; max-width:58ch; color:var(--muted); margin:18px 0 0}
+.rules{background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:22px; display:grid; gap:14px}
+.rules h2{font-size:.95rem; letter-spacing:.06em; text-transform:uppercase}
+.rules ol{margin:0; padding-left:1.2em; display:grid; gap:8px}
+.unit{font-family:var(--f-data); font-size:.9rem; background:var(--sunk); border:1px dashed var(--line); padding:10px 12px; border-radius:4px}
+.btn{appearance:none; border:0; cursor:pointer; background:var(--ipe); color:#1A1405; font-family:var(--f-display); font-weight:700; font-size:1rem; padding:14px 22px; border-radius:4px; display:inline-flex; align-items:center; gap:10px}
+.btn:hover{filter:brightness(1.05)}
+.btn.ghost{background:transparent; color:var(--ink); border:2px solid var(--line)}
+.row{display:flex; flex-wrap:wrap; gap:12px; align-items:center}
+
+/* fase */
+.phase-head{display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 16px; margin-bottom:18px}
+.eyebrow{font-family:var(--f-data); font-size:.78rem; letter-spacing:.1em; text-transform:uppercase; color:var(--teal)}
+.phase-head h2{font-size:clamp(1.6rem, 4vw, 2.4rem); font-weight:800; width:100%}
+.scene{font-size:1.12rem; max-width:62ch; margin:0 0 22px}
+.grid{display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); gap:24px; align-items:start}
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:20px; min-width:0}
+.panel h3{font-size:.82rem; letter-spacing:.08em; text-transform:uppercase; margin-bottom:12px; color:var(--muted); font-family:var(--f-data); font-weight:600}
+.note{font-size:.92rem; color:var(--muted); margin:12px 0 0}
+.note b{color:var(--ink)}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse; width:100%; font-size:.95rem}
+th,td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top}
+th{font-family:var(--f-data); font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:600}
+td.n{font-family:var(--f-data); font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right}
+th.n{text-align:right}
+.formula{font-family:var(--f-data); font-size:.88rem; background:var(--teal-soft); color:var(--ink); padding:8px 12px; border-radius:4px; margin-top:12px}
+
+/* opções */
+.opts{display:grid; gap:12px}
+.opt{appearance:none; text-align:left; cursor:pointer; background:var(--surface); border:2px solid var(--line); border-radius:6px; padding:16px; display:grid; grid-template-columns:auto 1fr; gap:4px 14px; transition:border-color .15s, transform .15s}
+.opt:hover:not(:disabled){border-color:var(--ipe); transform:translateY(-1px)}
+.opt .k{grid-row:span 2; font-family:var(--f-display); font-weight:800; font-size:1.1rem; width:38px; height:38px; display:grid; place-items:center; border-radius:4px; background:var(--sunk); border:1px solid var(--line)}
+.opt .t{font-weight:700}
+.opt .d{color:var(--muted); font-size:.95rem}
+.opt:disabled{cursor:default; opacity:.55}
+.opt.chosen{opacity:1; border-color:var(--ipe); background:var(--ipe-soft)}
+.opt.chosen .k{background:var(--ipe); color:#1A1405; border-color:var(--ipe)}
+.opt .em{grid-column:2; font-family:var(--f-data); font-size:.9rem; font-variant-numeric:tabular-nums; color:var(--ink)}
+
+/* resultado */
+.result{margin-top:24px; display:grid; gap:18px}
+.verdict{display:flex; flex-wrap:wrap; gap:12px 24px; align-items:center; padding:18px 20px; border-radius:6px; border:1px solid var(--line); background:var(--surface)}
+.verdict .big{font-family:var(--f-display); font-weight:800; font-size:2rem; font-variant-numeric:tabular-nums}
+.verdict .big small{font-size:.9rem; font-weight:500}
+.tag{font-family:var(--f-data); font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; padding:4px 10px; border-radius:99px; font-weight:600}
+.tag.best{background:color-mix(in srgb, var(--good) 20%, transparent); color:var(--good)}
+.tag.mid{background:var(--ipe-soft); color:var(--ink)}
+.tag.worst{background:var(--ember-soft); color:var(--ember)}
+.lesson{border-left:4px solid var(--teal); padding:4px 0 4px 16px; font-size:1.05rem; max-width:70ch}
+
+/* barras */
+.bars{display:grid; gap:10px}
+.bar{display:grid; grid-template-columns:minmax(90px, 30%) 1fr auto; gap:10px; align-items:center; font-size:.92rem}
+.bar .lbl{min-width:0; overflow-wrap:anywhere}
+.bar .track{height:20px; background:var(--sunk); border-radius:2px; position:relative; overflow:hidden}
+.bar .fill{position:absolute; inset:0 auto 0 0; background:var(--teal); border-radius:2px; transition:width .7s cubic-bezier(.2,.8,.2,1)}
+.bar.hi .fill{background:var(--ipe)}
+.bar.bad .fill{background:var(--ember)}
+.bar .v{font-family:var(--f-data); font-variant-numeric:tabular-nums; font-size:.88rem; min-width:76px; text-align:right}
+.bar.hi .lbl{font-weight:700}
+
+details{background:var(--sunk); border:1px solid var(--line); border-radius:6px; padding:12px 16px}
+summary{cursor:pointer; font-weight:700}
+.calc-list{display:grid; gap:10px; margin-top:12px}
+.calc-list div{font-family:var(--f-data); font-size:.86rem; line-height:1.55}
+.calc-list b{font-family:var(--f-body); font-size:.95rem}
+
+/* gráficos svg */
+svg.chart{width:100%; height:auto; display:block}
+.ax{stroke:var(--line); stroke-width:1}
+.grd{stroke:var(--line); stroke-width:1; stroke-dasharray:3 4}
+.tk{fill:var(--muted); font-family:var(--f-data); font-size:12px}
+.al{fill:var(--muted); font-family:var(--f-body); font-size:13px}
+.s-teal{stroke:var(--teal)} .s-ipe{stroke:var(--ipe)} .s-ember{stroke:var(--ember)} .s-good{stroke:var(--good)} .s-muted{stroke:var(--muted)}
+.f-teal{fill:var(--teal)} .f-ipe{fill:var(--ipe)} .f-ember{fill:var(--ember)} .f-good{fill:var(--good)} .f-muted{fill:var(--muted)} .f-ink{fill:var(--ink)} .f-surface{fill:var(--surface)}
+.legend{display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.88rem; margin-top:8px}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+.legend i{width:14px; height:4px; border-radius:2px; display:inline-block}
+
+/* final */
+.end-top{display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:stretch}
+.score{background:var(--ink); color:var(--bg); border-radius:6px; padding:24px; display:grid; gap:10px; align-content:start}
+.score .lv{font-family:var(--f-display); font-weight:800; font-size:clamp(1.6rem,4vw,2.4rem); color:var(--ipe)}
+.score .nums{display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-top:8px}
+.score .nums div{font-family:var(--f-data); font-variant-numeric:tabular-nums}
+.score .nums small{display:block; font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; opacity:.7; font-family:var(--f-body)}
+.score .nums b{font-size:1.3rem}
+.scale{height:14px; border-radius:2px; position:relative; background:linear-gradient(90deg, var(--good), var(--ipe), var(--ember)); margin-top:14px}
+.scale i{position:absolute; top:-6px; width:4px; height:26px; background:var(--bg); border-radius:2px; transform:translateX(-50%)}
+.scale-l{display:flex; justify-content:space-between; font-size:.75rem; font-family:var(--f-data); opacity:.8}
+.section{margin-top:28px}
+.section > h2{font-size:1.3rem; margin-bottom:14px}
+.q{background:var(--ipe-soft); border-radius:6px; padding:18px 20px}
+.q h3{font-size:1rem; margin-bottom:8px}
+.q ol{margin:0; padding-left:1.2em; display:grid; gap:6px}
+
+/* calculadora */
+.calc-btn{position:fixed; right:calc(16px + env(safe-area-inset-right,0px)); bottom:calc(16px + env(safe-area-inset-bottom,0px)); z-index:6; background:var(--teal); color:#fff; border:0; border-radius:99px; padding:12px 18px; font-family:var(--f-display); font-weight:700; font-size:.9rem; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.2)}
+.calc{position:fixed; right:calc(16px + env(safe-area-inset-right,0px)); bottom:calc(72px + env(safe-area-inset-bottom,0px)); z-index:6; width:min(340px, calc(100vw - 32px)); background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.25); display:grid; gap:8px}
+.calc input{width:100%; font-family:var(--f-data); font-size:1rem; padding:10px; border:1px solid var(--line); border-radius:4px; background:var(--sunk); color:var(--ink)}
+.calc .out{font-family:var(--f-data); font-size:1.3rem; text-align:right; font-variant-numeric:tabular-nums; min-height:1.6em}
+.calc .hist{font-family:var(--f-data); font-size:.8rem; color:var(--muted); max-height:110px; overflow:auto; display:grid; gap:2px}
+.calc p{margin:0; font-size:.8rem; color:var(--muted)}
+
+@media (max-width:820px){
+  .intro, .grid, .end-top{grid-template-columns:1fr}
+  .meter{text-align:left}
+  .bar{grid-template-columns:1fr auto; }
+  .bar .lbl{grid-column:1 / -1}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important; animation:none!important} }
+</style>
+</head>
+<body>
+
+<header class="top"><div class="wrap">
+  <div class="brand"><i></i>Rastro de Carbono</div>
+  <div class="pips" id="pips" aria-hidden="true"></div>
+  <div class="meter" aria-live="polite"><small>sua pegada acumulada</small><b id="meter">0 kg CO₂e</b></div>
+</div></header>
+
+<main><div class="wrap" id="app"></div></main>
+
+<button class="calc-btn" id="calcBtn" type="button" aria-expanded="false" aria-controls="calc">Calculadora</button>
+<div class="calc" id="calc" hidden>
+  <label for="calcIn" style="font-weight:700">Calculadora</label>
+  <input id="calcIn" type="text" inputmode="decimal" autocomplete="off" placeholder="ex.: 4 * 6 * 200 * 0,05 / 4">
+  <div class="out" id="calcOut">0</div>
+  <p>Use + − * / e parênteses. Vírgula ou ponto para decimais. Enter guarda no histórico.</p>
+  <div class="hist" id="calcHist"></div>
+</div>
+
+<script>
+/* ---------- formatação ---------- */
+const fmt = (v, d) => {
+  const dig = d !== undefined ? d : (Math.abs(v) < 10 ? 2 : 1);
+  return v.toLocaleString('pt-BR', {maximumFractionDigits: dig});
+};
+const kg = v => fmt(v) + ' kg';
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- gráficos ---------- */
+function niceTicks(max, n = 5){
+  const raw = max / n, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * p).find(s => s >= raw);
+  const t = []; for (let v = 0; v <= max + step * 0.001; v += step) t.push(+v.toFixed(6));
+  if (t[t.length - 1] < max) t.push(+(t[t.length - 1] + step).toFixed(6));
+  return t;
+}
+function barsHTML(items, unit){
+  const max = Math.max(...items.map(i => i.value)) || 1;
+  return '<div class="bars">' + items.map(i =>
+    `<div class="bar ${i.cls || ''}"><div class="lbl">${i.label}</div>
+      <div class="track"><div class="fill" style="width:${(i.value / max * 100).toFixed(2)}%"></div></div>
+      <div class="v">${fmt(i.value)} ${unit}</div></div>`).join('') + '</div>';
+}
+function lineSVG({series, xmax, ymax, xticks, yticks, xlabel, ylabel, marks = [], xfmt = v => fmt(v)}){
+  const W = 620, H = 320, L = 58, R = 18, T = 16, B = 50;
+  const x = v => L + (v / xmax) * (W - L - R), y = v => T + (1 - v / ymax) * (H - T - B);
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img"><defs><clipPath id="clp${W}${ymax}"><rect x="${L}" y="${T - 2}" width="${W - L - R}" height="${H - T - B + 2}"/></clipPath></defs>`;
+  yticks.forEach(t => { s += `<line class="grd" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text class="tk" x="${L - 8}" y="${y(t) + 4}" text-anchor="end">${fmt(t)}</text>`; });
+  xticks.forEach(t => { s += `<text class="tk" x="${x(t)}" y="${H - B + 18}" text-anchor="middle">${xfmt(t)}</text>`; });
+  s += `<line class="ax" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/><line class="ax" x1="${L}" x2="${L}" y1="${T}" y2="${y(0)}"/>`;
+  s += `<text class="al" x="${(L + W - R) / 2}" y="${H - 8}" text-anchor="middle">${xlabel}</text>`;
+  s += `<text class="al" transform="translate(14 ${(T + H - B) / 2}) rotate(-90)" text-anchor="middle">${ylabel}</text>`;
+  s += `<g clip-path="url(#clp${W}${ymax})">`;
+  series.forEach(se => {
+    const d = se.pts.map((p, i) => (i ? 'L' : 'M') + x(p[0]).toFixed(1) + ' ' + y(p[1]).toFixed(1)).join(' ');
+    s += `<path d="${d}" fill="none" class="s-${se.cls}" stroke-width="${se.w || 3}" stroke-linejoin="round" stroke-linecap="round" ${se.dash ? 'stroke-dasharray="6 6"' : ''}/>`;
+    if (se.dots) se.pts.forEach(p => { s += `<circle cx="${x(p[0])}" cy="${y(p[1])}" r="4" class="f-${se.cls}"/>`; });
+  });
+  s += '</g>';
+  marks.forEach(m => { s += `<circle cx="${x(m.x)}" cy="${y(m.y)}" r="6" class="f-surface s-ink" stroke-width="2" style="stroke:var(--ink)"/><text class="tk" x="${x(m.x) + (m.dx || 0)}" y="${y(m.y) - 12}" text-anchor="${m.anchor || 'middle'}" style="fill:var(--ink);font-weight:600">${m.label}</text>`; });
+  return s + '</svg><div class="legend">' + series.filter(se => se.name).map(se => `<span><i style="background:var(--${se.cls})"></i>${se.name}</span>`).join('') + '</div>';
+}
+function pieSVG(items){
+  const cx = 110, cy = 110, r = 96; let a0 = -Math.PI / 2, s = '';
+  const total = items.reduce((a, b) => a + b.value, 0);
+  items.forEach(it => {
+    const a1 = a0 + it.value / total * 2 * Math.PI, big = a1 - a0 > Math.PI ? 1 : 0;
+    s += `<path d="M${cx} ${cy} L${cx + r * Math.cos(a0)} ${cy + r * Math.sin(a0)} A${r} ${r} 0 ${big} 1 ${cx + r * Math.cos(a1)} ${cy + r * Math.sin(a1)} Z" class="f-${it.cls}" style="stroke:var(--surface);stroke-width:2"/>`;
+    a0 = a1;
+  });
+  return `<div class="row" style="gap:20px;align-items:center"><svg class="chart" viewBox="0 0 220 220" style="max-width:200px" role="img">${s}</svg>
+    <div class="legend" style="flex-direction:column;gap:8px">${items.map(it => `<span><i style="background:var(--${it.cls});height:14px"></i>${it.label}: <b style="font-family:var(--f-data)">${fmt(it.value, 0)}%</b></span>`).join('')}</div></div>`;
+}
+function tableHTML(head, rows, numCols = []){
+  return `<div class="tbl-wrap"><table><thead><tr>${head.map((h, i) => `<th class="${numCols.includes(i) ? 'n' : ''}">${h}</th>`).join('')}</tr></thead><tbody>` +
+    rows.map(r => '<tr>' + r.map((c, i) => `<td class="${numCols.includes(i) ? 'n' : ''}">${c}</td>`).join('') + '</tr>').join('') + '</tbody></table></div>';
+}
+
+/* ---------- fases ---------- */
+const ALIM = [['Carne bovina', 60], ['Queijo', 21], ['Carne suína', 7], ['Frango', 6], ['Ovos', 4.5], ['Arroz', 4], ['Tofu', 3], ['Feijão', 1]];
+const PHASES = [
+{
+  tema: 'Mobilidade', titulo: 'O caminho da escola',
+  cena: 'Começou o ano letivo: são 200 dias de aula. A escola fica a 5 km da sua casa. Como você vai e volta todos os dias?',
+  dados: () => tableHTML(['Veículo', 'Emissão', 'Detalhe'], [
+      ['Carro a gasolina', '0,12 kg por km', 'por km que o carro roda'],
+      ['Carro a etanol', '0,05 kg por km', 'a cana absorve CO₂ enquanto cresce'],
+      ['Ônibus a diesel', '1,20 kg por km', 'leva em média 30 passageiros']]) +
+    '<p class="note"><b>Atenção:</b> a emissão é do veículo inteiro. Se ele leva várias pessoas, divida entre elas. E a viagem de volta com o carro vazio também conta.</p>',
+  opcoes: [
+    {t: 'Seu pai te leva de carro a gasolina', d: 'Ele te deixa e volta para casa; na saída, faz o mesmo. São 4 trechos de 5 km por dia.', kg: 480, conta: '4 × 5 km × 200 dias = 4 000 km<br>4 000 × 0,12 = 480 kg'},
+    {t: 'Ônibus municipal', d: 'O ônibus faz um caminho mais longo: 7 km por trecho, ida e volta.', kg: 112, conta: '2 × 7 km × 200 dias = 2 800 km<br>por passageiro: 1,20 ÷ 30 = 0,04 kg/km<br>2 800 × 0,04 = 112 kg'},
+    {t: 'Carona solidária num carro a etanol', d: 'A mãe de um colega leva 4 alunos. Ela faz 6 km por trecho e também volta para casa: 4 trechos por dia.', kg: 60, conta: '4 × 6 km × 200 dias = 4 800 km<br>4 800 × 0,05 = 240 kg<br>240 ÷ 4 alunos = 60 kg'}],
+  licao: 'Um carro cheio e movido a etanol emitiu menos por pessoa do que o ônibus. O que importa é a emissão dividida pelo número de passageiros, contando as voltas com o carro vazio.'
+},
+{
+  tema: 'Energia em casa', titulo: 'A hora do banho',
+  cena: 'Você toma um banho por dia, 365 dias no ano. Na sua casa dá para escolher entre o aquecedor a gás e o chuveiro elétrico.',
+  dados: () => tableHTML(['Item', 'Valor'], [
+      ['Eletricidade no Brasil', '0,06 kg CO₂e por kWh'],
+      ['Calor do aquecedor a gás', '0,23 kg CO₂e por kWh de calor'],
+      ['Chuveiro elétrico no modo inverno', 'potência de 7 500 W = 7,5 kW'],
+      ['Aquecedor a gás (vazão maior)', 'gasta 0,18 kWh de calor por minuto']], []) +
+    '<div class="formula">energia (kWh) = potência (kW) × tempo (h)</div>' +
+    '<p class="note">A eletricidade brasileira vem principalmente de hidrelétricas, usinas eólicas e solares.</p>',
+  opcoes: [
+    {t: 'Aquecedor a gás, banho de 10 minutos', d: 'Água quente e com bastante pressão.', kg: 151.1, conta: '0,18 × 10 = 1,8 kWh por dia<br>1,8 × 0,23 = 0,414 kg por dia<br>0,414 × 365 ≈ 151,1 kg'},
+    {t: 'Aquecedor a gás, banho rápido de 5 minutos', d: 'Metade do tempo do banho normal.', kg: 75.6, conta: '0,18 × 5 = 0,9 kWh por dia<br>0,9 × 0,23 = 0,207 kg por dia<br>0,207 × 365 ≈ 75,6 kg'},
+    {t: 'Chuveiro elétrico no inverno, banho de 12 minutos', d: 'Mais tempo debaixo da água, no modo mais quente.', kg: 32.9, conta: '12 min = 0,2 h<br>7,5 × 0,2 = 1,5 kWh por dia<br>1,5 × 0,06 = 0,09 kg por dia<br>0,09 × 365 ≈ 32,9 kg'}],
+  licao: 'Como a eletricidade no Brasil é bastante limpa, o banho elétrico mais longo emitiu menos do que o banho curto a gás. Num país que gera energia queimando carvão, a resposta poderia ser a oposta.'
+},
+{
+  tema: 'Alimentação', titulo: 'A marmita da semana',
+  cena: 'São 40 semanas de aula com 5 almoços cada. Arroz, feijão e salada são iguais em todos os cardápios. O que muda é a proteína.',
+  dados: () => '<h3>kg de CO₂e para produzir 1 kg de alimento</h3>' +
+    barsHTML(ALIM.map(([l, v]) => ({label: l, value: v, cls: v > 20 ? 'bad' : ''})), '') +
+    '<p class="note"><b>Porções:</b> carne, frango, queijo ou tofu = 150 g (0,15 kg). Dois ovos = 100 g (0,1 kg).</p>',
+  opcoes: [
+    {t: 'Bife 1 vez por semana e frango nos outros 4 dias', d: 'Cardápio “tradicional”.', kg: 504, conta: 'bife: 1 × 0,15 × 60 = 9 kg<br>frango: 4 × 0,15 × 6 = 3,6 kg<br>(9 + 3,6) × 40 = 504 kg'},
+    {t: 'Vegetariano: massa ou pizza com 150 g de queijo todos os dias', d: 'Nenhuma carne o ano inteiro.', kg: 630, conta: '5 × 0,15 × 21 = 15,75 kg por semana<br>15,75 × 40 = 630 kg'},
+    {t: 'Omelete de 2 ovos 3 vezes e frango 2 vezes', d: 'Sem carne vermelha.', kg: 126, conta: 'ovos: 3 × 0,1 × 4,5 = 1,35 kg<br>frango: 2 × 0,15 × 6 = 1,8 kg<br>(1,35 + 1,8) × 40 = 126 kg'},
+    {t: 'Tofu 3 vezes e bife 2 vezes', d: 'Mais da metade dos dias sem carne.', kg: 774, conta: 'tofu: 3 × 0,15 × 3 = 1,35 kg<br>bife: 2 × 0,15 × 60 = 18 kg<br>(1,35 + 18) × 40 = 774 kg'}],
+  licao: 'Tirar a carne não ajuda se o substituto for muito queijo, que também vem da vaca. E dois bifes por semana pesam muito mais do que três refeições de tofu conseguem economizar.'
+},
+{
+  tema: 'Consumo', titulo: 'O celular ficou lento',
+  cena: 'Seu celular tem 3 anos e a bateria não dura até o fim do dia. Vale considerar a emissão deste ano inteiro de uso.',
+  dados: () => '<h3>De onde vem a pegada de um smartphone (média mundial)</h3>' +
+    pieSVG([{label: 'Fabricação', value: 80, cls: 'ember'}, {label: 'Uso (energia)', value: 16, cls: 'ipe'}, {label: 'Transporte', value: 2, cls: 'teal'}, {label: 'Descarte', value: 2, cls: 'muted'}]) +
+    tableHTML(['Item', 'kg CO₂e'], [['Fabricar um top de linha', '85'], ['Fabricar um modelo básico', '55'], ['Recondicionado: 12% de um aparelho de 70 kg', '?'], ['Bateria nova', '3'], ['Energia de 1 ano de uso no Brasil', '0,3']], [1]),
+  opcoes: [
+    {t: 'Comprar o lançamento top de linha', d: 'Anunciado como 30% mais econômico em energia.', kg: 85.2, conta: 'fabricação: 85 kg<br>uso: 0,3 × 0,7 ≈ 0,2 kg<br>total ≈ 85,2 kg'},
+    {t: 'Comprar um modelo novo básico', d: 'Mais simples e mais barato.', kg: 55.3, conta: 'fabricação: 55 kg<br>uso: 0,3 kg<br>total = 55,3 kg'},
+    {t: 'Comprar um recondicionado', d: 'Aparelho usado, revisado e com garantia.', kg: 8.7, conta: 'revisão: 0,12 × 70 = 8,4 kg<br>uso: 0,3 kg<br>total = 8,7 kg'},
+    {t: 'Ficar com o seu e trocar só a bateria', d: 'Mais um ano com o mesmo aparelho.', kg: 3.3, conta: 'bateria: 3 kg<br>uso: 0,3 kg<br>total = 3,3 kg'}],
+  licao: 'Cerca de 80% da pegada de um celular acontece antes de você ligá-lo. Ser econômico em energia quase não muda o resultado: o que reduz é fabricar menos aparelhos.'
+},
+{
+  tema: 'Energia em casa', titulo: 'O verão chegou',
+  cena: 'São 90 dias de calor forte. Seu quarto vira um forno. Como você se refresca?',
+  dados: () => '<h3>Gases de ar-condicionado: poder de aquecer o planeta (GWP)</h3>' +
+    tableHTML(['Gás', '1 kg equivale a'], [['CO₂', '1 kg de CO₂'], ['R-32 (aparelhos novos)', '675 kg de CO₂'], ['R-22 (aparelhos antigos)', '1 810 kg de CO₂']], [1]) +
+    '<h3 style="margin-top:16px">Outros dados</h3>' +
+    tableHTML(['Item', 'Valor'], [['Vazamento de gás, aparelho antigo', '0,15 kg por ano'], ['Vazamento de gás, aparelho novo', '0,02 kg por ano'], ['Eletricidade no Brasil', '0,06 kg CO₂e por kWh']], [1]),
+  opcoes: [
+    {t: 'Ar-condicionado antigo (R-22, 1,4 kW) só 4 horas por noite', d: 'Uso “com moderação”. Ele precisa de recarga de gás todo ano.', kg: 301.7, conta: 'energia: 1,4 × 4 × 90 = 504 kWh<br>504 × 0,06 = 30,2 kg<br>vazamento: 0,15 × 1 810 = 271,5 kg<br>total = 301,7 kg'},
+    {t: 'Ar-condicionado novo inverter (R-32, 0,8 kW) 10 horas por dia', d: 'Mais horas ligado, mas aparelho moderno.', kg: 56.7, conta: 'energia: 0,8 × 10 × 90 = 720 kWh<br>720 × 0,06 = 43,2 kg<br>vazamento: 0,02 × 675 = 13,5 kg<br>total = 56,7 kg'},
+    {t: 'Ventilador de teto (60 W) ligado 24 horas por dia', d: 'Nunca desliga, nem quando você sai.', kg: 7.8, conta: '60 W = 0,06 kW<br>0,06 × 24 × 90 = 129,6 kWh<br>129,6 × 0,06 ≈ 7,8 kg'}],
+  licao: 'No aparelho antigo, o problema não foi a conta de luz: foi o gás que vaza. Um ventilador ligado o tempo todo emitiu menos do que o ar-condicionado usado poucas horas.'
+},
+{
+  tema: 'Mobilidade', titulo: 'Férias em Salvador',
+  cena: 'Sua família (4 pessoas) vai de São Paulo a Salvador nas férias. Conte só a sua parte da viagem de ida e volta.',
+  dados: () => tableHTML(['Trajeto (só ida)', 'Distância'], [['Avião direto', '1 450 km'], ['Avião com conexão em Brasília', '870 + 1 060 = 1 930 km'], ['Pela estrada (ônibus ou carro)', '1 960 km']], [1]) +
+    '<h3 style="margin-top:16px">Fatores de emissão</h3>' +
+    tableHTML(['Meio', 'Emissão'], [['Avião', '0,14 kg por passageiro-km'], ['Ônibus leito', '0,035 kg por passageiro-km'], ['Carro a gasolina', '0,12 kg por km do carro']], [1]),
+  opcoes: [
+    {t: 'Voo direto', d: 'Duas horas e meia de viagem.', kg: 406, conta: '2 × 1 450 = 2 900 km<br>2 900 × 0,14 = 406 kg'},
+    {t: 'Voo com conexão em Brasília', d: 'R$ 600 mais barato para a família.', kg: 540.4, conta: '2 × 1 930 = 3 860 km<br>3 860 × 0,14 = 540,4 kg'},
+    {t: 'Ônibus leito', d: 'Cerca de 30 horas de estrada em cada sentido.', kg: 137.2, conta: '2 × 1 960 = 3 920 km<br>3 920 × 0,035 = 137,2 kg'},
+    {t: 'Carro a gasolina com a família toda', d: 'Dois dias de viagem, com parada para dormir.', kg: 117.6, conta: '2 × 1 960 = 3 920 km<br>3 920 × 0,12 = 470,4 kg<br>470,4 ÷ 4 pessoas = 117,6 kg'}],
+  licao: 'Uma única viagem de avião pode pesar mais do que um ano inteiro de idas à escola. Conexões aumentam a distância voada, e um carro cheio pode competir com o ônibus.'
+},
+{
+  tema: 'Consumo', titulo: 'As sacolas do mercado',
+  cena: 'Você faz 100 idas ao mercado no ano e usa 2 sacolas em cada uma. Qual estratégia de sacolas você adota?',
+  dados: () => tableHTML(['Sacola', 'Fabricação (kg CO₂e)', 'Aguenta'], [['Plástica fina', '0,02', '1 uso + vira saco de lixo'], ['Papel', '0,06', '3 usos'], ['Retornável de PP (tecido sintético)', '0,25', 'mais de 150 usos'], ['Ecobag de algodão', '2,7', 'anos']], [1]) +
+    '<div class="formula">emissão por uso = fabricação ÷ número de usos</div><h3 style="margin-top:16px">Emissão por uso (kg CO₂e)</h3>' +
+    lineSVG({
+      series: [
+        {name: 'Ecobag de algodão (2,7 ÷ usos)', cls: 'ember', pts: Array.from({length: 160}, (_, i) => [i + 1, 2.7 / (i + 1)])},
+        {name: 'Retornável de PP (0,25 ÷ usos)', cls: 'teal', pts: Array.from({length: 160}, (_, i) => [i + 1, 0.25 / (i + 1)])},
+        {name: 'Plástica fina (sempre nova)', cls: 'ipe', dash: true, pts: [[0, 0.02], [160, 0.02]]}],
+      xmax: 160, ymax: 0.3, xticks: [0, 40, 80, 120, 160], yticks: [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3],
+      xlabel: 'número de usos da sacola', ylabel: 'kg CO₂e por uso', marks: [{x: 135, y: 0.02, label: 'empate?', anchor: 'middle'}]}),
+  opcoes: [
+    {t: 'Sacolinha plástica nova a cada compra', d: 'Depois cada uma vira saco de lixo em casa.', kg: 4, conta: '100 × 2 = 200 sacolas<br>200 × 0,02 = 4 kg'},
+    {t: 'Sacolas de papel novas a cada compra', d: 'Papel parece mais natural.', kg: 12, conta: '200 × 0,06 = 12 kg'},
+    {t: 'Coleção de ecobags de algodão', d: 'Você ganhou e comprou 5 ecobags diferentes no ano e foi alternando.', kg: 13.5, conta: '5 × 2,7 = 13,5 kg<br>cada uma foi usada só 40 vezes (200 ÷ 5)'},
+    {t: '2 sacolas retornáveis de PP usadas o ano todo', d: 'Sempre as mesmas duas.', kg: 0.5, conta: '2 × 0,25 = 0,5 kg'}],
+  licao: 'Uma ecobag de algodão precisa de uns 135 usos para empatar com a sacolinha (2,7 ÷ 0,02 = 135). Colecionar ecobags emite mais do que usar plástico. A sacola mais limpa é a que você reutiliza muitas vezes.'
+},
+{
+  tema: 'Consumo', titulo: 'Guarda-roupa novo',
+  cena: 'Você cresceu e precisa renovar as roupas deste ano. Qual plano você segue?',
+  dados: () => '<h3>kg de CO₂e por peça</h3>' + barsHTML([
+      {label: 'Calça jeans nova', value: 33, cls: 'bad'}, {label: 'Camiseta de algodão nova', value: 7}, {label: 'Camiseta de poliéster nova', value: 5.5}, {label: 'Peça de brechó (lavagem e transporte)', value: 1}], 'kg') +
+    '<p class="note">Carro a gasolina: <b>0,12 kg por km</b>.</p>',
+  opcoes: [
+    {t: '12 camisetas baratas de algodão', d: 'Uma por mês, na loja de departamento.', kg: 84, conta: '12 × 7 = 84 kg'},
+    {t: '6 camisetas de poliéster', d: 'Secam rápido e duram bastante.', kg: 33, conta: '6 × 5,5 = 33 kg'},
+    {t: '1 calça jeans e 3 camisetas de algodão', d: 'Poucas peças novas.', kg: 54, conta: 'jeans: 33 kg<br>camisetas: 3 × 7 = 21 kg<br>total = 54 kg'},
+    {t: '10 peças de brechó, buscando de carro em 5 brechós', d: 'Cada brechó fica a 15 km: 30 km de ida e volta, de carro a gasolina.', kg: 28, conta: 'peças: 10 × 1 = 10 kg<br>carro: 5 × 30 × 0,12 = 18 kg<br>total = 28 kg'}],
+  licao: 'Comprar usado reduziu bastante, mesmo com as viagens de carro. Mas repare: o carro emitiu quase o dobro das próprias roupas. Juntar as compras numa única saída teria deixado tudo ainda menor.'
+},
+{
+  tema: 'Alimentação', titulo: 'Comida no lixo',
+  cena: 'Você come cerca de 300 kg de comida por ano. Uma parte do que é comprado estraga antes de ser consumida. Como a sua casa faz as compras?',
+  dados: () => tableHTML(['Item', 'kg CO₂e por kg'], [['Produzir a comida (média)', '2,5'], ['Comida no lixo comum (aterro, vira metano)', '0,6'], ['Comida na composteira', '0,05']], [1]) +
+    '<div class="formula">comprado = consumido ÷ (1 − fração desperdiçada)<br>desperdiçado = comprado − consumido</div>' +
+    '<p class="note">Só conta aqui a emissão da comida que foi <b>desperdiçada</b>: a que foi comida aparece igual em todas as opções.</p>',
+  opcoes: [
+    {t: 'Compra mensal no atacado, lixo comum', d: 'Sai mais barato, mas 25% estraga.', kg: 310, conta: 'comprado: 300 ÷ 0,75 = 400 kg<br>desperdiçado: 400 − 300 = 100 kg<br>100 × (2,5 + 0,6) = 310 kg'},
+    {t: 'Compra mensal no atacado, mas com composteira', d: '25% estraga, e tudo vai para a composteira.', kg: 255, conta: 'desperdiçado: 100 kg<br>100 × (2,5 + 0,05) = 255 kg'},
+    {t: 'Compra semanal planejada, lixo comum', d: 'Lista de compras e cardápio da semana: só 8% estraga.', kg: 80.6, conta: 'comprado: 300 ÷ 0,92 ≈ 326 kg<br>desperdiçado: 326 − 300 = 26 kg<br>26 × (2,5 + 0,6) = 80,6 kg'}],
+  licao: 'A composteira ajuda, mas a maior parte da emissão já aconteceu na produção do alimento. Desperdiçar menos vale muito mais do que dar um bom destino ao desperdício.'
+},
+{
+  tema: 'Energia em casa', titulo: 'Fogão da família',
+  cena: 'O fogão quebrou. Sua família de 4 pessoas gasta 1 botijão de gás por mês. A sua parte é 1/4 do total do ano.',
+  dados: () => tableHTML(['Dado', 'Valor'], [
+      ['Botijão P13', '13 kg de GLP'], ['1 kg de GLP queimado', '3 kg de CO₂'], ['Energia de 1 kg de GLP', '12,8 kWh'],
+      ['Eficiência do fogão a gás', '40% do calor vai para a panela'], ['Eficiência do cooktop de indução', '85%'],
+      ['Eletricidade no Brasil', '0,06 kg CO₂e por kWh'], ['Fabricar um cooktop novo', '20 kg CO₂e']], [1]) +
+    '<div class="formula">calor útil = energia × eficiência</div>',
+  opcoes: [
+    {t: 'Fogão a gás novo, do jeito de sempre', d: 'Um botijão por mês.', kg: 117, conta: '12 × 13 × 3 = 468 kg<br>468 ÷ 4 = 117 kg'},
+    {t: 'Fogão a gás e panela de pressão para tudo', d: 'A panela de pressão economiza 30% do gás.', kg: 81.9, conta: '468 × 0,7 = 327,6 kg<br>327,6 ÷ 4 = 81,9 kg'},
+    {t: 'Cooktop de indução (elétrico)', d: 'É preciso fabricar um aparelho novo.', kg: 19.1, conta: 'calor útil: 13 × 12,8 × 0,40 ≈ 66,6 kWh por mês<br>eletricidade: 66,6 ÷ 0,85 ≈ 78,3 kWh por mês<br>78,3 × 12 ≈ 940 kWh → 940 × 0,06 = 56,4 kg<br>(56,4 + 20) ÷ 4 = 19,1 kg'}],
+  licao: 'De novo a matriz elétrica brasileira fez diferença: trocar a chama pela eletricidade cortou a emissão em mais de 80%, mesmo contando a fabricação do aparelho.'
+},
+{
+  tema: 'Consumo', titulo: 'Compras pela internet',
+  cena: 'Ao longo do ano você compra 20 itens: livros, fone, tênis, presentes. Como eles chegam até você?',
+  dados: () => tableHTML(['Forma de entrega', 'kg CO₂e'], [
+      ['Entrega expressa (moto, mesmo dia)', '1,0 por pacote'], ['Entrega padrão (van com rota planejada)', '0,25 por pacote'],
+      ['Retirada em armário (locker) perto de casa, a pé', '0,15 por pacote'], ['Carro a gasolina', '0,12 por km']], [1]) +
+    '<p class="note">O shopping fica a <b>15 km</b> da sua casa.</p>',
+  opcoes: [
+    {t: 'Entrega expressa, um item por pacote', d: 'Chega no mesmo dia.', kg: 20, conta: '20 × 1,0 = 20 kg'},
+    {t: 'Entrega padrão, juntando os pedidos em 5 pacotes', d: 'Você espera para comprar várias coisas de uma vez.', kg: 1.25, conta: '5 × 0,25 = 1,25 kg'},
+    {t: 'Retirar no locker, um item por pacote', d: 'Você busca a pé.', kg: 3, conta: '20 × 0,15 = 3 kg'},
+    {t: 'Ir ao shopping de carro 8 vezes', d: 'Ver o produto antes de comprar.', kg: 28.8, conta: '8 × 2 × 15 = 240 km<br>240 × 0,12 = 28,8 kg'}],
+  licao: 'Ir de carro à loja pode emitir mais do que receber em casa. E juntar pedidos faz uma diferença enorme: a urgência é que custa caro.'
+},
+{
+  tema: 'Alimentação', titulo: 'Festa de formatura',
+  cena: 'Fim do 9º ano! A turma vai votar o cardápio da festa. Qual opção você defende? Conte só o que você vai comer.',
+  dados: () => '<h3>kg de CO₂e por kg de alimento</h3>' +
+    barsHTML(ALIM.filter(a => ['Carne bovina', 'Queijo', 'Carne suína', 'Frango'].includes(a[0])).map(([l, v]) => ({label: l, value: v, cls: v > 20 ? 'bad' : ''})), ''),
+  opcoes: [
+    {t: 'Churrasco de picanha', d: '300 g de carne bovina por pessoa.', kg: 18, conta: '0,3 × 60 = 18 kg'},
+    {t: 'Rodízio de pizza', d: 'Cerca de 250 g de queijo por pessoa.', kg: 5.25, conta: '0,25 × 21 = 5,25 kg'},
+    {t: 'Churrasco de frango e linguiça de porco', d: '150 g de cada por pessoa.', kg: 1.95, conta: 'frango: 0,15 × 6 = 0,9 kg<br>linguiça: 0,15 × 7 = 1,05 kg<br>total = 1,95 kg'},
+    {t: 'Feijoada', d: '100 g de carne-seca (bovina) e 150 g de carne de porco por pessoa.', kg: 7.05, conta: 'carne-seca: 0,1 × 60 = 6 kg<br>porco: 0,15 × 7 = 1,05 kg<br>total = 7,05 kg'}],
+  licao: 'Não é preciso abrir mão do churrasco: trocar o tipo de carne reduziu a emissão a cerca de um nono. Nos alimentos, a pergunta mais importante é “de qual animal veio?”.'
+}];
+
+const BEST = PHASES.map(p => Math.min(...p.opcoes.map(o => o.kg)));
+const WORST = PHASES.map(p => Math.max(...p.opcoes.map(o => o.kg)));
+const sum = a => a.reduce((x, y) => x + y, 0);
+const LETTERS = 'ABCD';
+
+/* ---------- estado ---------- */
+let S = {screen: 'intro', idx: 0, choices: [], order: []};
+const shuffle = n => { const a = [...Array(n).keys()]; for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const app = document.getElementById('app');
+
+function myKg(i){ return PHASES[i].opcoes[S.choices[i]].kg; }
+function total(){ return sum(S.choices.map((c, i) => c == null ? 0 : PHASES[i].opcoes[c].kg)); }
+
+function renderTop(){
+  const pips = document.getElementById('pips');
+  pips.innerHTML = PHASES.map((_, i) => `<div class="pip ${S.choices[i] != null ? 'done' : (S.screen === 'phase' && i === S.idx ? 'now' : '')}"></div>`).join('');
+  document.getElementById('meter').textContent = fmt(total(), 1) + ' kg CO₂e';
+}
+
+function render(){
+  renderTop();
+  if (S.screen === 'intro') return renderIntro();
+  if (S.screen === 'phase') return renderPhase();
+  return renderEnd();
+}
+
+function start(){
+  S = {screen: 'phase', idx: 0, choices: Array(PHASES.length).fill(null), order: PHASES.map(p => shuffle(p.opcoes.length))};
+  render(); window.scrollTo(0, 0);
+}
+
+function renderIntro(){
+  app.innerHTML = `<section class="intro">
+    <div>
+      <p class="eyebrow">Um jogo de decisões e contas</p>
+      <h1>Um ano inteiro.<br>12 escolhas.<br><span>Quanto CO₂ fica no seu rastro?</span></h1>
+      <p class="lead">Cada coisa que você faz no dia a dia emite gases que aquecem o planeta: o caminho da escola, o banho, a comida, o celular. Atravesse um ano da vida de um estudante e tente chegar em dezembro com a menor pegada possível.</p>
+      <div class="row" style="margin-top:24px"><button class="btn" id="go" type="button">Começar o ano →</button></div>
+    </div>
+    <aside class="rules">
+      <h2>Como jogar</h2>
+      <ol>
+        <li>Cada fase traz uma situação, dados reais aproximados (tabelas e gráficos) e de 3 a 4 opções.</li>
+        <li>A emissão de cada opção <b>não aparece</b>. Use os dados para calcular antes de decidir. A calculadora fica no canto da tela.</li>
+        <li>Depois de escolher, você vê as contas de todas as opções e quanto poderia ter economizado.</li>
+        <li>As emissões se acumulam. No fim do ano, compare seu total com a melhor e a pior rota possíveis.</li>
+      </ol>
+      <div class="unit"><b>kg CO₂e</b> = quilogramas de CO₂ equivalente. Outros gases, como o metano, são convertidos para a quantidade de CO₂ que aqueceria o planeta do mesmo jeito.</div>
+      <p class="note" style="margin:0">Cuidado: a opção que <i>parece</i> mais sustentável nem sempre é a que emite menos.</p>
+    </aside></section>`;
+  document.getElementById('go').onclick = start;
+}
+
+function renderPhase(){
+  const i = S.idx, p = PHASES[i], ord = S.order[i], ch = S.choices[i];
+  const answered = ch != null;
+  let html = `<div class="phase-head"><span class="eyebrow">Fase ${i + 1} de ${PHASES.length} · ${p.tema}</span><h2>${p.titulo}</h2></div>
+    <p class="scene">${p.cena}</p>
+    <div class="grid"><section class="panel"><h3>Dados da fase</h3>${p.dados()}</section>
+    <section><div class="opts" role="group" aria-label="Opções">` +
+    ord.map((oi, pos) => { const o = p.opcoes[oi];
+      return `<button type="button" class="opt ${ch === oi ? 'chosen' : ''}" data-o="${oi}" ${answered ? 'disabled' : ''}>
+        <span class="k">${LETTERS[pos]}</span><span class="t">${o.t}</span><span class="d">${o.d}</span>
+        ${answered ? `<span class="em">${kg(o.kg)} CO₂e</span>` : ''}</button>`; }).join('') +
+    `</div></section></div>`;
+
+  if (answered){
+    const mine = p.opcoes[ch].kg, best = BEST[i], worst = WORST[i];
+    const cls = mine === best ? 'best' : (mine === worst ? 'worst' : 'mid');
+    const tagTxt = mine === best ? 'Melhor escolha da fase' : (mine === worst ? 'Maior emissão da fase' : 'Dava para fazer melhor');
+    const bestOpt = p.opcoes.find(o => o.kg === best);
+    const msg = mine === best ? 'Você encontrou a opção de menor emissão.' :
+      `A melhor opção era <b>${esc(bestOpt.t)}</b>, com ${kg(best)}. Você emitiu <b>${kg(mine - best)}</b> a mais${best > 0 ? ` (${fmt(mine / best, 1)} vezes mais)` : ''}.`;
+    html += `<div class="result" id="result">
+      <div class="verdict"><div class="big">+${fmt(mine, 1)} <small>kg CO₂e</small></div><span class="tag ${cls}">${tagTxt}</span><div style="flex:1;min-width:220px">${msg}</div></div>
+      <div class="grid">
+        <section class="panel"><h3>Comparação das opções (kg CO₂e)</h3>${barsHTML(ord.map((oi, pos) => ({label: LETTERS[pos] + ' · ' + p.opcoes[oi].t, value: p.opcoes[oi].kg, cls: oi === ch ? 'hi' : (p.opcoes[oi].kg === worst ? 'bad' : '')})), 'kg')}</section>
+        <section style="display:grid;gap:16px;min-width:0">
+          <p class="lesson">${p.licao}</p>
+          <details><summary>Ver as contas de todas as opções</summary><div class="calc-list">${ord.map((oi, pos) => `<div><b>${LETTERS[pos]} · ${p.opcoes[oi].t}</b><br>${p.opcoes[oi].conta}</div>`).join('')}</div></details>
+          <div class="row"><button class="btn" id="next" type="button">${i + 1 < PHASES.length ? 'Próxima fase →' : 'Ver o balanço do ano →'}</button></div>
+        </section>
+      </div></div>`;
+  }
+  app.innerHTML = html;
+  app.querySelectorAll('.opt:not([disabled])').forEach(b => b.onclick = () => {
+    S.choices[i] = +b.dataset.o; render();
+    const r = document.getElementById('result'); if (r) r.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start'});
+  });
+  const nx = document.getElementById('next');
+  if (nx) nx.onclick = () => { if (i + 1 < PHASES.length){ S.idx++; } else { S.screen = 'end'; } render(); window.scrollTo(0, 0); };
+}
+
+function renderEnd(){
+  const you = total(), best = sum(BEST), worst = sum(WORST);
+  const score = Math.round((worst - you) / (worst - best) * 100);
+  const lvl = score >= 90 ? 'Rastro quase invisível' : score >= 70 ? 'Pegada leve' : score >= 45 ? 'No meio do caminho' : score >= 20 ? 'Pegada pesada' : 'Rastro de fumaça';
+  const cum = arr => arr.reduce((a, v, k) => (a.push([k + 1, (a.length ? a[a.length - 1][1] : 0) + v]), a), [[0, 0]]);
+  const yours = PHASES.map((_, i) => myKg(i));
+  const yt = niceTicks(worst, 5);
+  const bestN = S.choices.filter((c, i) => PHASES[i].opcoes[c].kg === BEST[i]).length;
+  const extra = PHASES.map((p, i) => ({i, d: yours[i] - BEST[i]})).sort((a, b) => b.d - a.d).filter(x => x.d > 0.05);
+
+  app.innerHTML = `<p class="eyebrow">Balanço do ano</p><h2 style="font-size:clamp(1.8rem,5vw,3rem);font-weight:800;margin:6px 0 22px">Dezembro chegou. Este é o seu rastro.</h2>
+  <div class="end-top">
+    <div class="score">
+      <span style="font-size:.85rem;opacity:.8">Seu nível</span><div class="lv">${lvl}</div>
+      <div>Você acertou a melhor opção em <b>${bestN} de ${PHASES.length}</b> fases e chegou a <b>${score}%</b> do caminho entre a pior e a melhor rota possível.</div>
+      <div class="scale"><i style="left:${Math.max(0, Math.min(100, 100 - score))}%"></i></div>
+      <div class="scale-l"><span>melhor: ${fmt(best, 0)} kg</span><span>pior: ${fmt(worst, 0)} kg</span></div>
+      <div class="nums"><div><small>Você</small><b>${fmt(you, 0)}</b> kg</div><div><small>Melhor rota</small><b>${fmt(best, 0)}</b> kg</div><div><small>Pior rota</small><b>${fmt(worst, 0)}</b> kg</div></div>
+    </div>
+    <section class="panel"><h3>Emissão acumulada ao longo do ano (kg CO₂e)</h3>
+      ${lineSVG({series: [
+        {name: 'Pior rota', cls: 'ember', pts: cum(WORST), w: 2.5, dash: true},
+        {name: 'Você', cls: 'ipe', pts: cum(yours), w: 4, dots: true},
+        {name: 'Melhor rota', cls: 'good', pts: cum(BEST), w: 2.5, dash: true}],
+        xmax: PHASES.length, ymax: yt[yt.length - 1], xticks: PHASES.map((_, k) => k + 1).filter(k => k % 2 === 0 || k === 1), yticks: yt,
+        xlabel: 'fase', ylabel: 'kg CO₂e acumulado'})}
+    </section>
+  </div>
+
+  <div class="section grid">
+    <section class="panel"><h3>Onde estava o seu excesso (kg acima da melhor opção)</h3>
+      ${extra.length ? barsHTML(extra.map(x => ({label: (x.i + 1) + '. ' + PHASES[x.i].titulo, value: x.d, cls: x.d === extra[0].d ? 'bad' : ''})), 'kg') : '<p>Nenhum! Você escolheu a melhor opção em todas as fases.</p>'}
+    </section>
+    <section class="panel"><h3>Fase por fase</h3>
+      ${tableHTML(['Fase', 'Você', 'Melhor', 'Pior'], PHASES.map((p, i) => [(i + 1) + '. ' + p.titulo, fmt(yours[i], 1), fmt(BEST[i], 1), fmt(WORST[i], 1)]).concat([['<b>Total</b>', '<b>' + fmt(you, 1) + '</b>', '<b>' + fmt(best, 1) + '</b>', '<b>' + fmt(worst, 1) + '</b>']]), [1, 2, 3])}
+    </section>
+  </div>
+
+  <div class="section q">
+    <h3>Para pensar e calcular</h3>
+    <ol>
+      <li>Qual fase teve a maior diferença entre a melhor e a pior opção? Calcule essa diferença em kg e em porcentagem do seu total.</li>
+      <li>Na fase das sacolas, quantos usos uma ecobag de algodão precisa para empatar com uma retornável de PP? (2,7 ÷ 0,25 = ?)</li>
+      <li>Em três fases a eletricidade venceu o gás. O resultado seria o mesmo num país com energia a 0,8 kg CO₂e por kWh? Refaça a conta do banho.</li>
+      <li>Somando todas as fases de alimentação, que fração (em %) do seu total veio da comida?</li>
+    </ol>
+  </div>
+
+  <div class="row section"><button class="btn" id="again" type="button">Jogar de novo</button><button class="btn ghost" id="home" type="button">Voltar ao início</button></div>
+  <p class="note">Valores aproximados para fins didáticos, baseados em médias de bases públicas (fatores de emissão do SIN/MCTI, Poore &amp; Nemecek 2018 via Our World in Data, estudo de sacolas da Environment Agency do Reino Unido, GWP do IPCC). Cada caso real pode variar.</p>`;
+  document.getElementById('again').onclick = start;
+  document.getElementById('home').onclick = () => { S = {screen: 'intro', idx: 0, choices: [], order: []}; render(); window.scrollTo(0, 0); };
+}
+
+/* ---------- calculadora ---------- */
+(function(){
+  const btn = document.getElementById('calcBtn'), box = document.getElementById('calc'), inp = document.getElementById('calcIn'), out = document.getElementById('calcOut'), hist = document.getElementById('calcHist');
+  const ev = s => {
+    const e = s.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-').replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2').replace(/,/g, '.').replace(/\s+/g, '');
+    if (!e) return null;
+    if (!/^[\d+\-*/().]+$/.test(e)) return NaN;
+    try { const v = Function('"use strict";return (' + e + ')')(); return typeof v === 'number' && isFinite(v) ? v : NaN; } catch (_) { return NaN; }
+  };
+  const show = () => { const v = ev(inp.value); out.textContent = v === null ? '0' : (isNaN(v) ? 'conta incompleta' : v.toLocaleString('pt-BR', {maximumFractionDigits: 4})); return v; };
+  btn.onclick = () => { box.hidden = !box.hidden; btn.setAttribute('aria-expanded', String(!box.hidden)); if (!box.hidden) inp.focus(); };
+  inp.addEventListener('input', show);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ const v = show(); if (v !== null && !isNaN(v)){ const d = document.createElement('div'); d.textContent = inp.value + ' = ' + v.toLocaleString('pt-BR', {maximumFractionDigits: 4}); hist.prepend(d); inp.value = ''; } } if (e.key === 'Escape'){ box.hidden = true; btn.setAttribute('aria-expanded', 'false'); btn.focus(); } });
+})();
+
+/* ---------- inicialização ---------- */
+render();
+</script>
+
+</body>
+</html>
